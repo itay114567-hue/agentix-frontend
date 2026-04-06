@@ -1807,7 +1807,7 @@ function DemoBookingModal() {
         </DialogHeader>
         <div className="w-full" style={{ height: "580px" }}>
           <iframe
-            src="https://calendly.com/agentix-demo/30min?embed_domain=agentix.ai&embed_type=Inline&hide_gdpr_banner=1"
+            src="https://calendly.com/itay11456/30min?embed_domain=agentix.ai&embed_type=Inline&hide_gdpr_banner=1"
             width="100%"
             height="100%"
             frameBorder="0"
