@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 // ─── Modal State (global event bus) ──────────────────────────────────────────
 function openDemoModal() {
@@ -152,6 +153,15 @@ function InteractiveDemo() {
       return () => clearTimeout(t);
     }
   }, [emailStep, activeTab]);
+
+  const [wavePhase, setWavePhase] = useState(0);
+  useEffect(() => {
+    if (!voiceActive) return;
+    const interval = setInterval(() => {
+      setWavePhase(p => p + 0.18);
+    }, 60);
+    return () => clearInterval(interval);
+  }, [voiceActive]);
 
   const tabConfig = {
     chat: { label: "Chat", icon: MessageSquare, color: "#2563EB", metric1: "0.3s", label1: "Avg response", metric2: "94.7%", label2: "Resolution rate" },
@@ -354,13 +364,12 @@ function InteractiveDemo() {
                     {Array.from({ length: 32 }).map((_, i) => (
                       <div
                         key={i}
-                        className="rounded-full transition-all"
+                        className="rounded-full"
                         style={{
                           width: '3px',
-                          height: voiceActive ? `${8 + Math.sin(i * 0.6 + Date.now() * 0.003) * 12 + Math.random() * 6}px` : '4px',
+                          height: voiceActive ? `${8 + Math.sin(i * 0.6 + wavePhase) * 12 + Math.sin(i * 1.1 + wavePhase * 0.7) * 4}px` : '4px',
                           background: voiceActive ? '#8b5cf6' : 'rgba(139,92,246,0.3)',
-                          transition: 'height 0.15s ease',
-                          animationDelay: `${i * 0.05}s`,
+                          transition: 'height 0.08s ease',
                         }}
                       />
                     ))}
@@ -489,49 +498,7 @@ function InteractiveDemo() {
   );
 }
 
-// ─── Metrics Dashboard ────────────────────────────────────────────────────────────
-function MetricsDashboard() {
-  const [animateMetrics, setAnimateMetrics] = useState(false);
-  const clients = useCounter(500, 2000, animateMetrics);
-  const resolution = useCounter(94, 2000, animateMetrics);
-  const costReduction = useCounter(76, 2000, animateMetrics);
-  
-  useEffect(() => {
-    const timer = setTimeout(() => setAnimateMetrics(true), 500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  return (
-    <section className="section-dark py-20">
-      <div className="container mx-auto">
-        <div className="grid md:grid-cols-4 gap-8">
-          <div className="text-center reveal">
-            <div className="text-5xl font-bold text-[#2563EB] mb-2" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-              {clients}+
-            </div>
-            <p className="text-white/70" style={{ fontFamily: "Inter, sans-serif" }}>Enterprise Clients</p>
-          </div>
-          <div className="text-center reveal">
-            <div className="text-5xl font-bold text-[#2563EB] mb-2" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-              {resolution}%
-            </div>
-            <p className="text-white/70" style={{ fontFamily: "Inter, sans-serif" }}>Resolution Rate</p>
-          </div>
-          <div className="text-center reveal">
-            <div className="text-5xl font-bold text-[#2563EB] mb-2" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-              {costReduction}%
-            </div>
-            <p className="text-white/70" style={{ fontFamily: "Inter, sans-serif" }}>Cost Reduction</p>
-          </div>
-          <div className="text-center reveal">
-            <div className="text-5xl font-bold text-[#2563EB] mb-2" style={{ fontFamily: "Space Grotesk, sans-serif" }}>24/7</div>
-            <p className="text-white/70" style={{ fontFamily: "Inter, sans-serif" }}>Always Available</p>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
+// MetricsDashboard removed — stats consolidated into StatsBar below
 
 // ─── Announcement Bar ─────────────────────────────────────────────────────────
 function AnnouncementBar() {
@@ -602,7 +569,12 @@ function Navbar({ scrolled }: { scrolled: boolean }) {
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="md:hidden bg-[#050508]/98 backdrop-blur-md border-t border-white/10 px-6 py-6 flex flex-col gap-5" role="navigation" aria-label="Mobile navigation">
+        <div
+          className="md:hidden bg-[#050508]/98 backdrop-blur-md border-t border-white/10 px-6 py-6 flex flex-col gap-5"
+          role="navigation"
+          aria-label="Mobile navigation"
+          style={{ animation: "slideDown 0.22s ease-out" }}
+        >
           <a href="/platform" className="nav-link text-lg" onClick={() => setMobileOpen(false)}>Platform</a>
           <a href="/use-cases" className="nav-link text-lg" onClick={() => setMobileOpen(false)}>Use Cases</a>
           <a href="#features" className="nav-link text-lg" onClick={() => setMobileOpen(false)}>Features</a>
@@ -634,6 +606,10 @@ function HeroSection() {
       const delay = chatStep === 0 ? 1000 : 1500;
       const timer = setTimeout(() => setChatStep((s) => s + 1), delay);
       return () => clearTimeout(timer);
+    } else {
+      // Auto-reset after 3 seconds so the demo loops
+      const resetTimer = setTimeout(() => setChatStep(0), 3000);
+      return () => clearTimeout(resetTimer);
     }
   }, [chatStep]);
 
@@ -1104,29 +1080,30 @@ function IndustriesSection() {
 // ─── Social Proof Bar ──────────────────────────────────────────────────────────────
 function SocialProofBar() {
   const companies = [
-    { name: "TechCorp", logo: "TC" },
-    { name: "Global Retail", logo: "GR" },
-    { name: "FinanceHub", logo: "FH" },
-    { name: "HealthFirst", logo: "HF" },
-    { name: "TravelMax", logo: "TM" },
-    { name: "InsureAll", logo: "IA" },
+    { name: "Salesforce", abbr: "SF", color: "#00A1E0" },
+    { name: "Shopify", abbr: "S", color: "#96BF48" },
+    { name: "HubSpot", abbr: "HS", color: "#FF7A59" },
+    { name: "Zendesk", abbr: "ZD", color: "#03363D" },
+    { name: "Stripe", abbr: "S_", color: "#635BFF" },
+    { name: "Twilio", abbr: "TW", color: "#F22F46" },
   ];
 
   return (
     <section className="section-light py-12 border-b border-gray-200">
       <div className="container mx-auto">
-        <p className="text-center text-gray-500 text-sm mb-8" style={{ fontFamily: "Inter, sans-serif" }}>
-          Trusted by industry leaders
+        <p className="text-center text-gray-400 text-xs font-semibold uppercase tracking-widest mb-8" style={{ fontFamily: "Inter, sans-serif" }}>
+          Integrates with tools your team already uses
         </p>
         <div className="flex flex-wrap justify-center items-center gap-8 md:gap-12">
           {companies.map((company, i) => (
-            <div key={i} className="flex items-center justify-center h-12 px-4 reveal" style={{ transitionDelay: `${i * 0.05}s` }}>
-              <div className="w-10 h-10 bg-gradient-to-br from-[#2563EB] to-[#1d4ed8] rounded-lg flex items-center justify-center">
-                <span className="text-white text-xs font-bold" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-                  {company.logo}
-                </span>
+            <div key={i} className="flex items-center gap-2.5 opacity-60 hover:opacity-100 transition-opacity reveal" style={{ transitionDelay: `${i * 0.05}s` }}>
+              <div
+                className="w-8 h-8 rounded-md flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                style={{ background: company.color, fontFamily: "Space Grotesk, sans-serif" }}
+              >
+                {company.abbr.replace('_', '')}
               </div>
-              <span className="ml-2 text-gray-700 font-semibold text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
+              <span className="text-gray-700 font-semibold text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
                 {company.name}
               </span>
             </div>
@@ -1284,158 +1261,102 @@ const testimonials = [
 
 // ─── Video Carousel Section ──────────────────────────────────────────────────────
 function VideoCarouselSection() {
-  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [autoPlay, setAutoPlay] = useState(true);
 
-  const videos = [
+  const testimonials = [
     {
-      id: "video1",
-      title: "ShopGlobal Success Story",
       quote: "We replaced 120 support agents with Agentix in 6 weeks. Our CSAT score went up by 18 points and costs dropped by 73%.",
       author: "Sarah Chen",
       role: "VP Customer Experience, NovaTech",
-      thumbnail: "https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
-      videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-      color: "#3B82F6"
+      metric: "73% cost reduction",
+      color: "#3B82F6",
+      bg: "from-blue-50 to-blue-100/50",
     },
     {
-      id: "video2",
-      title: "FinanceHub Implementation",
       quote: "The implementation was surprisingly smooth. Agentix's team handled everything and our AI agents were live in 10 days.",
       author: "Marcus Williams",
       role: "COO, Apex Financial",
-      thumbnail: "https://img.youtube.com/vi/jNQXAC9IVRw/maxresdefault.jpg",
-      videoUrl: "https://www.youtube.com/embed/jNQXAC9IVRw",
-      color: "#8B5CF6"
+      metric: "Live in 10 days",
+      color: "#8B5CF6",
+      bg: "from-purple-50 to-purple-100/50",
     },
     {
-      id: "video3",
-      title: "Peak Season Transformation",
       quote: "Our peak season used to be a nightmare. Now Agentix handles 50,000 simultaneous chats without breaking a sweat.",
       author: "Priya Sharma",
       role: "Head of Support, ShopGlobal",
-      thumbnail: "https://img.youtube.com/vi/9bZkp7q19f0/maxresdefault.jpg",
-      videoUrl: "https://www.youtube.com/embed/9bZkp7q19f0",
-      color: "#10B981"
-    }
+      metric: "50K concurrent chats",
+      color: "#10B981",
+      bg: "from-emerald-50 to-emerald-100/50",
+    },
   ];
 
-  const currentVideo = videos[currentVideoIndex];
+  const current = testimonials[currentIndex];
 
   useEffect(() => {
     if (!autoPlay) return;
     const timer = setInterval(() => {
-      setCurrentVideoIndex((prev) => (prev + 1) % videos.length);
-    }, 8000);
+      setCurrentIndex((prev) => (prev + 1) % testimonials.length);
+    }, 6000);
     return () => clearInterval(timer);
-  }, [autoPlay, videos.length]);
-
-  const goToVideo = (index: number) => {
-    setCurrentVideoIndex(index);
-    setAutoPlay(false);
-  };
-
-  const nextVideo = () => {
-    setCurrentVideoIndex((prev) => (prev + 1) % videos.length);
-    setAutoPlay(false);
-  };
-
-  const prevVideo = () => {
-    setCurrentVideoIndex((prev) => (prev - 1 + videos.length) % videos.length);
-    setAutoPlay(false);
-  };
+  }, [autoPlay, testimonials.length]);
 
   return (
     <section className="section-light py-28">
       <div className="container mx-auto">
         <div className="text-center mb-16 reveal">
-          <div className="label-tag mb-4 mx-auto w-fit">Customer Success Stories</div>
+          <div className="label-tag mb-4 mx-auto w-fit">Customer Stories</div>
           <h2 className="text-4xl lg:text-5xl font-bold text-[#050508] mb-4" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-            See Real Results from Real Customers
+            Trusted by industry leaders.
           </h2>
           <p className="text-gray-600 text-lg" style={{ fontFamily: "Inter, sans-serif" }}>
-            Hear directly from industry leaders about their transformation with Agentix
+            Hear directly from enterprise teams who've transformed their support with Agentix.
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Video Player */}
-          <div className="reveal">
-            <div className="relative bg-black rounded-2xl overflow-hidden shadow-2xl">
-              <iframe
-                width="100%"
-                height="400"
-                src={currentVideo.videoUrl}
-                title={currentVideo.title}
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="w-full"
-              />
+        <div className="max-w-4xl mx-auto reveal">
+          {/* Main testimonial card */}
+          <div className={`bg-gradient-to-br ${current.bg} border border-gray-200 rounded-3xl p-10 md:p-14 transition-all duration-500`}>
+            <div className="flex gap-1 mb-8">
+              {[1,2,3,4,5].map(j => <Star key={j} size={20} className="fill-yellow-400 text-yellow-400" />)}
             </div>
-            {/* Video Controls */}
-            <div className="flex items-center justify-between mt-6">
-              <button
-                onClick={prevVideo}
-                className="p-2 hover:bg-gray-100 rounded-full transition"
-                aria-label="Previous video"
-              >
-                <ChevronRight size={24} className="rotate-180" />
-              </button>
-              <div className="flex gap-2">
-                {videos.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => goToVideo(i)}
-                    className={`h-2 rounded-full transition ${
-                      i === currentVideoIndex ? "bg-[#2563EB] w-8" : "bg-gray-300 w-2"
-                    }`}
-                    aria-label={`Go to video ${i + 1}`}
-                  />
-                ))}
+            <p className="text-2xl md:text-3xl font-bold text-[#050508] leading-snug mb-10" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+              "{current.quote}"
+            </p>
+            <div className="flex items-center justify-between flex-wrap gap-6">
+              <div className="flex items-center gap-4">
+                <div
+                  className="w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
+                  style={{ background: current.color, fontFamily: "Space Grotesk, sans-serif" }}
+                >
+                  {current.author.split(' ').map(n => n[0]).join('')}
+                </div>
+                <div>
+                  <p className="font-bold text-[#050508] text-lg" style={{ fontFamily: "Space Grotesk, sans-serif" }}>{current.author}</p>
+                  <p className="text-gray-500 text-sm" style={{ fontFamily: "Inter, sans-serif" }}>{current.role}</p>
+                </div>
               </div>
-              <button
-                onClick={nextVideo}
-                className="p-2 hover:bg-gray-100 rounded-full transition"
-                aria-label="Next video"
-              >
-                <ChevronRight size={24} />
-              </button>
+              <div className="px-5 py-2 rounded-full text-sm font-bold text-white" style={{ background: current.color, fontFamily: "Space Grotesk, sans-serif" }}>
+                {current.metric}
+              </div>
             </div>
           </div>
 
-          {/* Testimonial Content */}
-          <div className="reveal">
-            <div className="flex gap-1 mb-6">
-              {[1, 2, 3, 4, 5].map((j) => (
-                <Star key={j} size={18} className="fill-yellow-400 text-yellow-400" />
+          {/* Dots + controls */}
+          <div className="flex items-center justify-center gap-6 mt-8">
+            <button onClick={() => { setCurrentIndex((currentIndex - 1 + testimonials.length) % testimonials.length); setAutoPlay(false); }} className="p-2 hover:bg-gray-100 rounded-full transition" aria-label="Previous">
+              <ChevronRight size={22} className="rotate-180 text-gray-600" />
+            </button>
+            <div className="flex gap-2">
+              {testimonials.map((_, i) => (
+                <button key={i} onClick={() => { setCurrentIndex(i); setAutoPlay(false); }}
+                  className={`h-2 rounded-full transition-all ${i === currentIndex ? "bg-[#2563EB] w-8" : "bg-gray-300 w-2"}`}
+                  aria-label={`Go to testimonial ${i + 1}`}
+                />
               ))}
             </div>
-            <p className="text-2xl font-bold text-[#050508] mb-6" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-              "{currentVideo.quote}"
-            </p>
-            <div className="flex items-center gap-4">
-              <div
-                className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-lg"
-                style={{ background: currentVideo.color, fontFamily: "Space Grotesk, sans-serif" }}
-              >
-                {currentVideo.author.split(' ').map(n => n[0]).join('')}
-              </div>
-              <div>
-                <p className="font-bold text-[#050508] text-lg" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-                  {currentVideo.author}
-                </p>
-                <p className="text-gray-600 text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
-                  {currentVideo.role}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setAutoPlay(!autoPlay)}
-              className="mt-8 px-6 py-3 bg-[#2563EB] text-white rounded-lg font-semibold hover:bg-[#1d4ed8] transition"
-              style={{ fontFamily: "Space Grotesk, sans-serif" }}
-            >
-              {autoPlay ? "Pause" : "Resume"} Carousel
+            <button onClick={() => { setCurrentIndex((currentIndex + 1) % testimonials.length); setAutoPlay(false); }} className="p-2 hover:bg-gray-100 rounded-full transition" aria-label="Next">
+              <ChevronRight size={22} className="text-gray-600" />
             </button>
           </div>
         </div>
@@ -1444,41 +1365,7 @@ function VideoCarouselSection() {
   );
 }
 
-function TestimonialsSection() {
-  return (
-    <section className="section-gray py-28">
-      <div className="container mx-auto">
-        <div className="text-center mb-16 reveal">
-          <div className="label-tag mb-4">Customer Stories</div>
-          <h2 className="text-4xl font-bold text-[#050508]" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-            Trusted by industry leaders.
-          </h2>
-        </div>
-        <div className="grid md:grid-cols-3 gap-6">
-          {testimonials.map((t, i) => (
-            <div key={i} className="card-feature reveal" style={{ transitionDelay: `${i * 0.1}s` }}>
-              <div className="flex gap-1 mb-5">
-                {[1,2,3,4,5].map(j => <Star key={j} size={14} className="fill-yellow-400 text-yellow-400" />)}
-              </div>
-              <p className="text-[#050508] text-sm leading-relaxed mb-6 italic" style={{ fontFamily: "Inter, sans-serif" }}>
-                "{t.quote}"
-              </p>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{ background: t.color, fontFamily: "Space Grotesk, sans-serif" }}>
-                  {t.initials}
-                </div>
-                <div>
-                  <p className="font-semibold text-[#050508] text-sm" style={{ fontFamily: "Space Grotesk, sans-serif" }}>{t.name}</p>
-                  <p className="text-gray-500 text-xs">{t.title}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
+// TestimonialsSection removed — testimonials are shown in VideoCarouselSection above
 
 // ─// ─── Pricing Section ─────────────────────────────────────────────────────────
 const pricingPlans = [
@@ -1786,7 +1673,7 @@ const pricingFAQs = [
   },
   {
     q: "Do you offer discounts for annual billing?",
-    a: "Yes! Annual billing saves you 20% compared to monthly pricing. For example, Growth plan is $119,988/year (vs $9,999/month), which equals $9,999/month when billed annually."
+    a: "Yes! Annual billing saves you 20% compared to monthly pricing. For example, the Growth plan at $9,999/month becomes $95,990/year when billed annually — saving you $24,000 compared to 12 monthly payments."
   },
   {
     q: "What happens if I exceed my conversation limits?",
@@ -1903,7 +1790,7 @@ function CaseStudySection() {
                 </div>
               </div>
             </div>
-            <button className="btn-primary mt-8">Read Full Case Study</button>
+            <button className="btn-primary mt-8" onClick={() => openDemoModal()}>Read Full Case Study</button>
           </div>
           <div className="bg-gradient-to-br from-[#2563EB]/20 to-[#2563EB]/5 rounded-2xl p-8 border border-[#2563EB]/20">
             <div className="space-y-6">
@@ -1939,8 +1826,8 @@ function WebinarCTASection() {
             Join our live webinar with industry experts. Discover best practices, real implementations, and ROI strategies.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="btn-primary px-8 py-3">Register for Webinar</button>
-            <button className="btn-outline-dark px-8 py-3">Watch Recording</button>
+            <button className="btn-primary px-8 py-3" onClick={() => openDemoModal()}>Register for Webinar</button>
+            <a href="/blog" className="btn-outline-dark px-8 py-3">Watch Recording</a>
           </div>
           <p className="text-xs text-gray-500 mt-6" style={{ fontFamily: "Inter, sans-serif" }}>Next webinar: April 15, 2026 at 2:00 PM EST</p>
         </div>
@@ -1992,14 +1879,14 @@ function BlogPreviewSection() {
                 <p className="text-gray-600 text-sm mb-4 line-clamp-2" style={{ fontFamily: "Inter, sans-serif" }}>{post.excerpt}</p>
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500" style={{ fontFamily: "Inter, sans-serif" }}>{post.date}</span>
-                  <a href="#" className="text-[#2563EB] text-sm font-semibold hover:underline" style={{ fontFamily: "Inter, sans-serif" }}>Read →</a>
+                  <a href="/blog" className="text-[#2563EB] text-sm font-semibold hover:underline" style={{ fontFamily: "Inter, sans-serif" }}>Read →</a>
                 </div>
               </div>
             </div>
           ))}
         </div>
         <div className="text-center mt-12 reveal">
-          <button className="btn-outline-dark px-8 py-3">View All Articles</button>
+          <a href="/blog" className="btn-outline-dark px-8 py-3">View All Articles</a>
         </div>
       </div>
     </section>
@@ -2033,7 +1920,7 @@ function PartnerProgramSection() {
               <p className="text-white" style={{ fontFamily: "Inter, sans-serif" }}>Dedicated partner support</p>
             </div>
           </div>
-          <button className="btn-primary px-8 py-3">Become a Partner</button>
+          <button className="btn-primary px-8 py-3" onClick={() => openDemoModal()}>Become a Partner</button>
         </div>
       </div>
     </section>
@@ -2074,30 +1961,13 @@ function CTASection() {
   );
 }
 
-// ─── Live Chat Widget ──────────────────────────────────────────────────────────
-// ─── Intercom Live Chat Widget ──────────────────────────────────────────────────
+// ─── Intercom removed (App ID not configured) ────────────────────────────────
+// To re-enable: replace YOUR_INTERCOM_APP_ID and uncomment below
 function IntercomChat() {
   useEffect(() => {
-    // Load Intercom script
-    window.intercomSettings = {
-      api_base: "https://api-iam.intercom.io",
-      app_id: "YOUR_INTERCOM_APP_ID", // Replace with your Intercom App ID
-      name: "Agentix Customer",
-      email: "customer@agentix.com",
-      created_at: Math.floor(Date.now() / 1000)
-    };
-
-    // Create and append Intercom script
-    const script = document.createElement("script");
-    script.async = true;
-    script.src = "https://widget.intercom.io/widget/YOUR_INTERCOM_APP_ID"; // Replace with your App ID
-    document.head.appendChild(script);
-
+    // Intercom disabled — configure app_id in environment before enabling
     return () => {
-      // Cleanup if needed
-      if (window.Intercom) {
-        window.Intercom("shutdown");
-      }
+      // no-op
     };
   }, []);
 
@@ -2305,11 +2175,51 @@ function ROICalculator() {
               </div>
             </div>
 
-            <div className="mt-8 p-4 bg-white rounded-lg border border-gray-200 text-center">
-              <p className="text-gray-700" style={{ fontFamily: "Inter, sans-serif" }}>
-                <span className="font-semibold">Payback Period:</span> {paybackMonths} months
-                {currency === 'ILS' && <span className="text-gray-400 text-xs ml-2">(based on {USD_TO_ILS} ILS/USD)</span>}
-              </p>
+            {/* Payback Chart */}
+            <div className="mt-8 bg-white rounded-xl border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="font-semibold text-[#050508]" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                    Payback Period: <span className="text-[#2563EB]">{paybackMonths} months</span>
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5" style={{ fontFamily: "Inter, sans-serif" }}>
+                    Cumulative savings vs. Agentix cost over 24 months
+                    {currency === 'ILS' && ` · Rate: ${USD_TO_ILS} ILS/USD`}
+                  </p>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={160}>
+                <LineChart
+                  data={Array.from({ length: 25 }, (_, month) => {
+                    const cumulativeSavings = (savingsUSD / 12) * month * fx;
+                    const cumulativeCost = (totalAgentixCostUSD / 12) * month * fx;
+                    return {
+                      month,
+                      savings: Math.round(cumulativeSavings),
+                      cost: Math.round(cumulativeCost),
+                    };
+                  })}
+                  margin={{ top: 4, right: 8, bottom: 0, left: 8 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={v => v === 0 ? 'Now' : `M${v}`} interval={3} />
+                  <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={v => v >= 1000000 ? `${sym}${(v/1000000).toFixed(1)}M` : `${sym}${(v/1000).toFixed(0)}K`} width={55} />
+                  <Tooltip
+                    formatter={(val: number, name: string) => [
+                      `${sym}${val.toLocaleString()}`,
+                      name === 'savings' ? 'Cumulative Savings' : 'Agentix Cost'
+                    ]}
+                    labelFormatter={(l) => l === 0 ? 'Now' : `Month ${l}`}
+                    contentStyle={{ fontSize: 12, fontFamily: 'Inter, sans-serif', borderRadius: 8 }}
+                  />
+                  <Line type="monotone" dataKey="savings" stroke="#10b981" strokeWidth={2.5} dot={false} name="savings" />
+                  <Line type="monotone" dataKey="cost" stroke="#2563EB" strokeWidth={2} strokeDasharray="5 3" dot={false} name="cost" />
+                </LineChart>
+              </ResponsiveContainer>
+              <div className="flex items-center gap-6 mt-3">
+                <div className="flex items-center gap-2"><div className="w-4 h-0.5 bg-[#10b981]" /><span className="text-xs text-gray-500">Cumulative savings</span></div>
+                <div className="flex items-center gap-2"><div className="w-4 h-0.5 bg-[#2563EB] border-dashed" style={{ borderTop: '2px dashed #2563EB', background: 'none', height: 0 }} /><span className="text-xs text-gray-500">Agentix cost</span></div>
+              </div>
             </div>
 
             {/* Email capture */}
@@ -2373,10 +2283,10 @@ function ROICalculator() {
 // ─── Resource Download Center ────────────────────────────────────────────────────────
 function ResourceDownloadCenter() {
   const resources = [
-    { title: "AI Agent Implementation Guide", type: "PDF", size: "2.4 MB" },
-    { title: "ROI Calculator Spreadsheet", type: "XLSX", size: "1.1 MB" },
-    { title: "Integration Best Practices", type: "PDF", size: "3.2 MB" },
-    { title: "Security & Compliance Checklist", type: "PDF", size: "1.8 MB" },
+    { title: "AI Agent Implementation Guide", type: "PDF", size: "2.4 MB", desc: "Step-by-step guide to deploying AI agents in your organization" },
+    { title: "ROI Calculator Spreadsheet", type: "XLSX", size: "1.1 MB", desc: "Calculate your expected savings before committing" },
+    { title: "Integration Best Practices", type: "PDF", size: "3.2 MB", desc: "Connect Agentix to your CRM, helpdesk, and communication tools" },
+    { title: "Security & Compliance Checklist", type: "PDF", size: "1.8 MB", desc: "Everything you need for SOC 2, GDPR, and HIPAA readiness" },
   ];
   return (
     <section className="section-dark py-20">
@@ -2384,15 +2294,23 @@ function ResourceDownloadCenter() {
         <div className="text-center mb-12 reveal">
           <h3 className="text-3xl font-bold text-white mb-4" style={{ fontFamily: "Space Grotesk, sans-serif" }}>Resource Library</h3>
           <p className="text-white/70" style={{ fontFamily: "Inter, sans-serif" }}>Download guides, templates, and tools to accelerate your AI implementation</p>
+          <p className="text-white/40 text-xs mt-2" style={{ fontFamily: "Inter, sans-serif" }}>Resources sent directly to your inbox — enter your email after clicking</p>
         </div>
         <div className="grid md:grid-cols-2 gap-4">
           {resources.map((r, i) => (
-            <div key={i} className="bg-white/5 border border-white/10 rounded-lg p-4 flex items-center justify-between hover:bg-white/10 transition reveal">
-              <div>
+            <div key={i} className="bg-white/5 border border-white/10 rounded-lg p-5 flex items-start justify-between gap-4 hover:bg-white/10 transition reveal">
+              <div className="flex-1">
                 <p className="font-semibold text-white" style={{ fontFamily: "Space Grotesk, sans-serif" }}>{r.title}</p>
-                <p className="text-sm text-white/50 mt-1" style={{ fontFamily: "Inter, sans-serif" }}>{r.type} • {r.size}</p>
+                <p className="text-sm text-white/40 mt-0.5 mb-2" style={{ fontFamily: "Inter, sans-serif" }}>{r.type} · {r.size}</p>
+                <p className="text-sm text-white/55 leading-relaxed" style={{ fontFamily: "Inter, sans-serif" }}>{r.desc}</p>
               </div>
-              <button className="bg-[#2563EB] text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold" style={{ fontFamily: "Space Grotesk, sans-serif" }}>Download</button>
+              <button
+                onClick={() => openDemoModal()}
+                className="bg-[#2563EB] text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold whitespace-nowrap flex-shrink-0"
+                style={{ fontFamily: "Space Grotesk, sans-serif" }}
+              >
+                Get Access
+              </button>
             </div>
           ))}
         </div>
@@ -2463,7 +2381,7 @@ function Footer() {
               </h4>
               <ul className="space-y-3">
                 {items.map((item) => (
-                  <li key={item}>
+                  <li key={item.label}>
                     <a href={item.href} className="text-white/40 hover:text-white/80 text-sm transition-colors" style={{ fontFamily: "Inter, sans-serif" }}>
                       {item.label}
                     </a>
@@ -2476,7 +2394,7 @@ function Footer() {
 
         <div className="border-t border-white/8 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-white/30 text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
-            © 2025 Agentix Technologies Ltd. All rights reserved.
+            © 2026 Agentix Technologies Ltd. All rights reserved.
           </p>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse-dot" />
@@ -2556,7 +2474,6 @@ export default function Home() {
       <Navbar scrolled={scrolled} />
       <HeroSection />
       <InteractiveDemo />
-      <MetricsDashboard />
       <StatsBar />
       <SocialProofBar />
       <IntegrationCarousel />
@@ -2579,7 +2496,6 @@ export default function Home() {
       <CTASection />
       <DemoBookingModal />
       <ExitIntentPopup />
-      <IntercomChat />
       <Footer />
     </div>
   );
